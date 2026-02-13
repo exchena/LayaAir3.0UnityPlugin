@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -18,7 +19,7 @@ internal class RefObject
     public int nodeId;
     public int RefCount = -1;
 
-    public void addRefData(GameObject gameObject,PerfabFile perfabFile)
+    public void addRefData(GameObject gameObject, PerfabFile perfabFile)
     {
         this.perfabRootGameObjects.Add(gameObject);
         this.perfabfiles.Add(perfabFile);
@@ -45,7 +46,7 @@ internal class RefObject
     }
 }
 
-internal class NodeMap 
+internal class NodeMap
 {
     private Dictionary<GameObject, RefObject> refMap;
     private Dictionary<GameObject, JSONObject> overrideMaps;
@@ -54,7 +55,7 @@ internal class NodeMap
     private ResoureMap _resoureMap;
     private List<GameObject> _roots;
     private int idOff;
-    public NodeMap(ResoureMap map,int idOff = 0)
+    public NodeMap(ResoureMap map, int idOff = 0)
     {
         this._resoureMap = map;
         this.idOff = idOff;
@@ -65,13 +66,13 @@ internal class NodeMap
         this._roots = new List<GameObject>();
     }
 
-    public void setNode(GameObject gameObject,bool isFirstNode = false, bool isperfabRoot = false)
+    public void setNode(GameObject gameObject, bool isFirstNode = false, bool isperfabRoot = false)
     {
         this.addGameObjectMap(gameObject, isperfabRoot);
         if (isFirstNode) this._roots.Add(gameObject);
     }
 
-    private void addGameObjectMap(GameObject gameObject,   bool isperfabRoot = false)
+    private void addGameObjectMap(GameObject gameObject, bool isperfabRoot = false)
     {
         if (this.refMap.ContainsKey(gameObject))
         {
@@ -82,7 +83,7 @@ internal class NodeMap
         string nodeStringId = "#" + nodeId;
         this.nodeIdMaps.Add(gameObject, nodeStringId);
         nodeData.AddField("_$id", nodeStringId);
-        
+
 
         RefObject refObject = new RefObject();
         refObject.gameObject = gameObject;
@@ -100,7 +101,7 @@ internal class NodeMap
             rt = PerfabFile.getPerfabFilePath(baseRefRoot);
             refObject.addRefData(baseRefRoot, this._resoureMap.getPerfabFile(rt));
         }
-        
+
 
         refObject.jsonDatas = nodeData;
         refObject.nodeId = nodeId;
@@ -127,26 +128,26 @@ internal class NodeMap
 
     public void createNodeTree()
     {
-        foreach(var refdata in this.refMap)
+        foreach (var refdata in this.refMap)
         {
             RefObject refobject = refdata.Value;
-            if (refobject.isRefObject()&&!refobject.isRefRoot())
+            if (refobject.isRefObject() && !refobject.isRefRoot())
             {
                 continue;
             }
             GameObject gameObject = refobject.gameObject;
-           
+
             if (gameObject.transform.parent == null) continue;
             GameObject partner = gameObject.transform.parent.gameObject;
             RefObject partnerref;
-            if (this.refMap.TryGetValue(partner,out partnerref))
+            if (this.refMap.TryGetValue(partner, out partnerref))
             {
                 this.addChildToPartner(refobject.jsonDatas, partnerref.jsonDatas);
             }
-            
+
         }
     }
-    private void CreateOriderMap(GameObject gameObject,int childIndex,int perfabIndex)
+    private void CreateOriderMap(GameObject gameObject, int childIndex, int perfabIndex)
     {
         OriderIndex oriderIndex = new OriderIndex();
         oriderIndex.childIndex = childIndex;
@@ -170,7 +171,7 @@ internal class NodeMap
     }
 
 
-    private List<string> getRefectIndex(GameObject gameObject,bool contentRoot = false)
+    private List<string> getRefectIndex(GameObject gameObject, bool contentRoot = false)
     {
         List<string> outIndex = new List<string>();
         RefObject refObject;
@@ -195,16 +196,16 @@ internal class NodeMap
                 foundObjec = rootData;
             }
         }
-       
-      
+
+
         return outIndex;
     }
 
-    private void getNodeRef(GameObject foundObject,GameObject root, ref List<int> paths)
+    private void getNodeRef(GameObject foundObject, GameObject root, ref List<int> paths)
     {
         paths.Clear();
         Transform gt = foundObject.transform;
-        while(gt!=null&&gt.gameObject != root)
+        while (gt != null && gt.gameObject != root)
         {
             paths.Insert(0, gt.GetSiblingIndex());
             gt = gt.parent;
@@ -214,91 +215,98 @@ internal class NodeMap
     public int getGameNode(List<int> paths)
     {
         Transform root = this._roots[paths[0]].transform;
-        for(var i = 1; i < paths.Count; i++)
+        for (var i = 1; i < paths.Count; i++)
         {
-            root = root.GetChild(paths[i]);
+            int index = paths[i];
+            if (index >= root.childCount)
+            {
+                // continue;
+                index = root.childCount - 1;
+            }
+
+            root = root.GetChild(index);
         }
         RefObject refObject;
-        if(!this.refMap.TryGetValue(root.gameObject, out refObject))
+        if (!this.refMap.TryGetValue(root.gameObject, out refObject))
         {
             return -1;
         }
         return refObject.nodeId;
     }
-   /* public void getRefNodeId(List<OriderIndex> nodeList, List<string> outIndex)
-    {
-        if(nodeList.Count<=0)
-        {
-            return;
-        }
-        GameObject root = this._roots[nodeList[0].perfabIndex];
-        while (nodeList.Count > 0 && !this.refMap.ContainsKey(root))
-        {
-            nodeList.RemoveAt(0);
-            if(nodeList.Count>0)
-            {
-                root = root.transform.GetChild(nodeList[0].perfabIndex).gameObject;
-            }
-        }
-        if (this.refMap.ContainsKey(root))
-        {
-            root = root.transform.parent.gameObject;
-            OriderIndex oriderIndex = nodeList[0];
-            oriderIndex.childIndex = 0;
-            oriderIndex.perfabIndex = 0;
-        }
-        outIndex.Add(this.getGameObjectId(root));
+    /* public void getRefNodeId(List<OriderIndex> nodeList, List<string> outIndex)
+     {
+         if(nodeList.Count<=0)
+         {
+             return;
+         }
+         GameObject root = this._roots[nodeList[0].perfabIndex];
+         while (nodeList.Count > 0 && !this.refMap.ContainsKey(root))
+         {
+             nodeList.RemoveAt(0);
+             if(nodeList.Count>0)
+             {
+                 root = root.transform.GetChild(nodeList[0].perfabIndex).gameObject;
+             }
+         }
+         if (this.refMap.ContainsKey(root))
+         {
+             root = root.transform.parent.gameObject;
+             OriderIndex oriderIndex = nodeList[0];
+             oriderIndex.childIndex = 0;
+             oriderIndex.perfabIndex = 0;
+         }
+         outIndex.Add(this.getGameObjectId(root));
 
-        if (this.refMap.ContainsKey(root))
-        {
-            this._resoureMap.GetPerfabByObject(root).nodeMap.getRefNodeId(nodeList, outIndex);
-        }
-    }*/
-    
+         if (this.refMap.ContainsKey(root))
+         {
+             this._resoureMap.GetPerfabByObject(root).nodeMap.getRefNodeId(nodeList, outIndex);
+         }
+     }*/
+
 
     public string getGameObjectId(GameObject gameObject)
     {
         return this.nodeIdMaps[gameObject];
     }
 
-    public  JSONObject getRefNodeIdObjet(GameObject gameObject)
+    public JSONObject getRefNodeIdObjet(GameObject gameObject)
     {
         JSONObject data = new JSONObject(JSONObject.Type.OBJECT);
         List<string> outIndex = this.getRefectIndex(gameObject, true);
-      /*  if (this.nodeIdMaps.ContainsKey(gameObject)){
-            data.AddField("_$ref", this.getGameObjectId(gameObject));
+        /*  if (this.nodeIdMaps.ContainsKey(gameObject)){
+              data.AddField("_$ref", this.getGameObjectId(gameObject));
+          }
+          else
+          {*/
+
+        JSONObject overrideIndex = new JSONObject(JSONObject.Type.ARRAY);
+        foreach (var index in outIndex)
+        {
+            overrideIndex.Add(index);
         }
-        else
-        {*/
-           
-            JSONObject overrideIndex = new JSONObject(JSONObject.Type.ARRAY);
-            foreach (var index in outIndex)
-            {
-                overrideIndex.Add(index);
-            }
-            data.AddField("_$ref", overrideIndex);
-      /*  }*/
-        
+        data.AddField("_$ref", overrideIndex);
+        /*  }*/
+
         return data;
     }
 
 
-    public bool setNodeParent(GameObject gameObject,GameObject partnerObject = null)
+    public bool setNodeParent(GameObject gameObject, GameObject partnerObject = null)
     {
-        if(partnerObject == null)
+        if (partnerObject == null)
         {
             partnerObject = gameObject.transform.parent.gameObject;
         }
         JSONObject partner = this.getJsonObject(partnerObject);
-        if(partner == null)
+        if (partner == null)
         {
             return false;
         }
         this.addChildToPartner(this.getJsonObject(gameObject), partner);
         return true;
     }
-    
-    private bool addChildToPartner(JSONObject child,JSONObject partner)
+
+    private bool addChildToPartner(JSONObject child, JSONObject partner)
     {
         JSONObject childs = partner.GetField("_$child");
         if (childs == null)
@@ -332,14 +340,14 @@ internal class NodeMap
         JSONObject nodeData = new JSONObject(JSONObject.Type.OBJECT);
         nodeData.AddField("_$ver", 1);
         JSONObject jsonData = this.getJsonObject(gameObject);
-        foreach(var key in jsonData.keys)
+        foreach (var key in jsonData.keys)
         {
             nodeData.AddField(key, jsonData.GetField(key));
         }
         return nodeData;
     }
 
-    private JSONObject getOverrideObject(GameObject gameObject,GameObject root)
+    private JSONObject getOverrideObject(GameObject gameObject, GameObject root)
     {
         JSONObject childdata;
         if (gameObject != root)
@@ -362,7 +370,7 @@ internal class NodeMap
         {
             childdata = this.getJsonObject(gameObject);
         }
-            
+
 
         return childdata;
     }
@@ -387,7 +395,7 @@ internal class NodeMap
             {
                 this._resoureMap.getComponentsData(refObject.gameObject, refObject.jsonDatas, this);
             }
-            else if(refObject.isRefRoot())
+            else if (refObject.isRefRoot())
             {
                 List<ObjectOverride> list = PrefabUtility.GetObjectOverrides(refObject.gameObject);
                 for (var i = 0; i < list.Count; i++)
